@@ -1,153 +1,569 @@
-# Homychain - Private Ethereum Network
+# LabChain - Join the Network
 
-A private Ethereum network with custom genesis attribution, running Reth (EL) and Lighthouse (CL/VC).
-
----
-
-## 🏗️ Architecture
-
-- **Execution Layer**: Reth (latest)
-- **Consensus Layer**: Lighthouse Beacon Node (latest)
-- **Validator Client**: Lighthouse VC (64 genesis validators)
-- **Network**: Post-merge PoS, 12-second slots
-- **Chain ID**: 1337
+Welcome to LabChain! This guide will help you join our network as a node operator or validator.
 
 ---
 
-## 📚 Documentation
+## Table of Contents
 
-### Quick Guides
-- **[Node Management Guide](docs/NODE_MANAGEMENT.md)** ⭐ **START HERE** - Complete guide for using `./node.sh`
-
-### Component Documentation
-- [Execution layer (`EL/`)](docs/execution-layer.md) – Reth nodes, bootnodes, RPC endpoints
-- [Consensus layer (`CL/`)](docs/consensus-layer.md) – Lighthouse beacon nodes
-- [Genesis tooling (`genesis/`)](docs/genesis.md) – Generate chainspec, JWT secret, validator keystores
-- [Validator clients (`VC/`)](docs/validator-client.md) – Manage validators and deposits
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Network Information](#network-information)
+- [Run a Full Node (EL + CL)](#run-a-full-node-el--cl)
+- [Run a Beacon Node (CL Only)](#run-a-beacon-node-cl-only)
+- [Run a Validator (VC Only)](#run-a-validator-vc-only)
+- [Useful Commands](#useful-commands)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## 🚀 Quick Start
+## Overview
 
-### Prerequisites
+LabChain is a Proof-of-Stake Ethereum network. There are three types of nodes you can run:
 
-- Docker & Docker Compose
-- Ports: 8545, 8546, 8551, 30303 (EL) | 5052, 9000 (CL)
-- Shared Docker network: `homychain-net`
+| Node Type | What It Does | When to Use |
+|-----------|--------------|-------------|
+| **Full Node** | Runs EL + CL together | You want to run your own complete node |
+| **Beacon Node** | Runs CL only | You have access to an external EL |
+| **Validator** | Runs VC only | You have access to an external Beacon Node and want to validate |
 
-### Step 1: Configure Your Network
+**Components:**
+- **Execution Layer (EL)**: Reth - processes transactions and smart contracts
+- **Consensus Layer (CL)**: Lighthouse Beacon Node - handles proof-of-stake consensus
+- **Validator Client (VC)**: Lighthouse VC - proposes and attests to blocks
 
-Edit `genesis.conf` at the project root with your network parameters:
+---
 
+## Prerequisites
+
+Before you begin, make sure you have:
+
+**1. Docker & Docker Compose**
 ```bash
-# Network identity
-CONFIG_NAME="mynetwork"           # Your network name (lowercase, no spaces)
-CHAIN_ID="12345"                  # Unique chain ID (avoid conflicts on chainlist.org)
-
-# Validator settings
-NUMBER_OF_VALIDATORS="64"         # Number of validators at genesis
-EL_AND_CL_MNEMONIC="your 24-word mnemonic here"  # Generate with: cast wallet new-mnemonic --words 24
-
-# Withdrawal configuration
-WITHDRAWAL_ADDRESS="0x..."        # Your ETH address for validator rewards
-WITHDRAWAL_TYPE="0x01"            # Use 0x01 for execution-address withdrawals
-
-# Timing
-SLOT_DURATION_IN_SECONDS="12"     # Block time in seconds
-GENESIS_DELAY="120"               # Wait time before chain starts (seconds)
-
-# Initial state
-GENESIS_GASLIMIT="45000000"       # Block gas limit (45M = mainnet default)
-VALIDATOR_BALANCE="32000000000"   # 32 ETH per validator (in gwei)
+# Verify installation
+docker --version
+docker compose version
 ```
 
-**Key Parameters Explained:**
-
-- **`CONFIG_NAME`** - A unique identifier for your network (e.g., "testnet", "devnet")
-- **`CHAIN_ID`** - Must be unique to prevent transaction replay attacks
-- **`EL_AND_CL_MNEMONIC`** - **Keep this secret!** Controls all validator keys
-- **`WITHDRAWAL_ADDRESS`** - Where validator rewards go (create with `cast wallet new`)
-- **`NUMBER_OF_VALIDATORS`** - More validators = more decentralization, slower on single machine
-
-**Fast development chain (3 second blocks):**
+**2. Foundry (for validators only)**
 ```bash
-SLOT_DURATION_IN_SECONDS="3"
-SLOT_DURATION_MS="3000"
+# Install Foundry
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+
+# Verify installation
+cast --version
 ```
 
-**More initial ETH per validator:**
+**3. jq (for validators only)**
 ```bash
-VALIDATOR_BALANCE="100000000000"  # 100 ETH instead of 32
+# macOS
+brew install jq
+
+# Ubuntu/Debian
+sudo apt install jq
 ```
 
-**Larger validator set:**
+**4. Minimum Hardware**
+- CPU: 4 cores
+- RAM: 8 GB
+- Storage: 100 GB SSD
+
+**5. Network Ports** (open in your firewall)
+- `30303` (TCP/UDP) - EL peer discovery
+- `9000` (TCP/UDP) - CL peer discovery
+
+---
+
+## Network Information
+
+| Parameter | Value |
+|-----------|-------|
+| Network Name | `lab-chain` |
+| Chain ID | `5222` |
+| Slot Duration | 12 seconds |
+| Deposit Contract | `0x5454545454545454545454545454545454545454` |
+
+**Bootnodes:**
+
 ```bash
-NUMBER_OF_VALIDATORS="256"  # Requires more CPU/RAM
+# EL Bootnode (enode)
+enode://CONTACT_ADMIN_FOR_ENODE@BOOTNODE_IP:30303
+
+# CL Bootnode (ENR)
+enr:-Iq4QJk4WqRkjsX5c2CXtOra6HnxN-BMXnWhmhEQO9Bn9iABTJGdjUOurM7Btj1ouKaFkvTRoju5vz2GPmVON2dffQKGAX53x8JigmlkgnY0gmlwhLKAlv6Jc2VjcDI1NmsxoQK6S-Cii_KmfFdUJL2TANL3ksaKUnNXvTCv1tLwXs0QgIN1ZHCCIyk
+```
+
+---
+
+## Run a Full Node (EL + CL)
+
+A Full Node runs both the Execution Layer and Consensus Layer together. Follow these steps:
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/YOUR_ORG/labchain.git
+cd labchain
 ```
 
 ### Step 2: Create Docker Network
 
 ```bash
-docker network create homychain-net
+docker network create labchain-net
 ```
 
-### Step 3: Generate Genesis Files
+### Step 3: Generate JWT Secret
+
+The JWT secret secures communication between EL and CL.
 
 ```bash
-./genesis/gen.sh
+mkdir -p config/jwt
+openssl rand -hex 32 > config/jwt/jwtsecret
 ```
 
-This creates:
-- `config/metadata/genesis.json` - Execution layer genesis
-- `config/metadata/config.yaml` - Consensus layer config
-- `config/jwt/jwtsecret.hex` - Secure authentication between EL/CL
-- `config/keystores/` - Validator private keys
-
-### Step 4: Initialize and Start the Network
+### Step 4: Configure EL Environment
 
 ```bash
-./node.sh init
+cd EL
+cp .env.example .env   # if exists, or create new
 ```
 
-This command:
-1. Initializes Reth with the genesis block
-2. Sets up Lighthouse beacon node
-3. Imports validator keystores
-4. Starts all services in the correct order
-
-**Startup Order (handled automatically):**
-1. EL (Reth) - Loads genesis
-2. CL (Lighthouse) - Connects to EL
-3. VC (Validators) - Connects to CL
-
-### Step 5: Verify Everything Works
+Edit `EL/.env`:
 
 ```bash
-# Check all services are running
+# EL/.env
+RETH_IMAGE=ghcr.io/paradigmxyz/reth:latest
+RETH_LOG_LEVEL=info
+
+# Ports
+HTTP_PORT=8545
+WS_PORT=8546
+AUTHRPC_PORT=8551
+P2P_PORT=30303
+
+# Add network bootnodes (get from network admin)
+BOOTNODES=enode://CONTACT_ADMIN_FOR_ENODE@BOOTNODE_IP:30303
+```
+
+### Step 5: Start the Execution Layer
+
+```bash
+cd ..
+./node.sh start el
+```
+
+Wait for EL to initialize (about 30 seconds).
+
+```bash
+# Check EL is running
+./node.sh logs el
+```
+
+### Step 6: Configure CL Environment
+
+```bash
+cd CL
+cp .env.example .env   # if exists, or create new
+```
+
+Edit `CL/.env`:
+
+```bash
+# CL/.env
+LIGHTHOUSE_IMAGE=sigp/lighthouse:latest
+LIGHTHOUSE_LOG_LEVEL=info
+
+# Connect to your local EL
+EXECUTION_ENDPOINT=http://reth:8551
+
+# Ports
+HTTP_PORT=5052
+P2P_PORT=9000
+
+# Your public IP (important for peer discovery)
+BEACON_ENR_ADDRESS=YOUR_PUBLIC_IP
+
+# Add network bootnodes
+BOOT_NODES=enr:-Iq4QJk4WqRkjsX5c2CXtOra6HnxN-BMXnWhmhEQO9Bn9iABTJGdjUOurM7Btj1ouKaFkvTRoju5vz2GPmVON2dffQKGAX53x8JigmlkgnY0gmlwhLKAlv6Jc2VjcDI1NmsxoQK6S-Cii_KmfFdUJL2TANL3ksaKUnNXvTCv1tLwXs0QgIN1ZHCCIyk
+
+TARGET_PEERS=64
+```
+
+### Step 7: Start the Consensus Layer
+
+```bash
+cd ..
+./node.sh start cl
+```
+
+### Step 8: Verify Everything is Running
+
+```bash
+# Check status of all nodes
 ./node.sh status
 
-# View real-time logs
-./node.sh logs all
-
-# Test RPC endpoint
+# Test EL RPC
 curl -X POST -H "Content-Type: application/json" \
   --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   http://localhost:8545
+
+# Test CL API
+curl http://localhost:5052/eth/v1/node/syncing
 ```
 
-### Step 6: Start Building!
-
-Your network is now ready. Connect to:
-- **HTTP RPC**: `http://localhost:8545`
-- **WebSocket**: `ws://localhost:8546`
-- **Beacon API**: `http://localhost:5052`
+You should see block numbers increasing. Your Full Node is now running!
 
 ---
 
-## 📄 License
+## Run a Beacon Node (CL Only)
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Run only the Consensus Layer if you have access to an external Execution Layer.
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/YOUR_ORG/labchain.git
+cd labchain
+```
+
+### Step 2: Create Docker Network
+
+```bash
+docker network create labchain-net
+```
+
+### Step 3: Get JWT Secret
+
+You must use the **same JWT secret** as the EL you're connecting to.
+
+```bash
+mkdir -p config/jwt
+# Copy the JWT secret from your EL provider
+echo "YOUR_JWT_SECRET_HEX" > config/jwt/jwtsecret
+```
+
+### Step 4: Configure CL Environment
+
+```bash
+cd CL
+cp .env.example .env   # if exists, or create new
+```
+
+Edit `CL/.env`:
+
+```bash
+# CL/.env
+LIGHTHOUSE_IMAGE=sigp/lighthouse:latest
+LIGHTHOUSE_LOG_LEVEL=info
+
+# Connect to external EL (replace with actual endpoint)
+EXECUTION_ENDPOINT=http://EXTERNAL_EL_IP:8551
+
+# Ports
+HTTP_PORT=5052
+P2P_PORT=9000
+
+# Your public IP
+BEACON_ENR_ADDRESS=YOUR_PUBLIC_IP
+
+# Network bootnodes
+BOOT_NODES=enr:-Iq4QJk4WqRkjsX5c2CXtOra6HnxN-BMXnWhmhEQO9Bn9iABTJGdjUOurM7Btj1ouKaFkvTRoju5vz2GPmVON2dffQKGAX53x8JigmlkgnY0gmlwhLKAlv6Jc2VjcDI1NmsxoQK6S-Cii_KmfFdUJL2TANL3ksaKUnNXvTCv1tLwXs0QgIN1ZHCCIyk
+
+TARGET_PEERS=64
+```
+
+### Step 5: Start the Beacon Node
+
+```bash
+cd ..
+./node.sh start cl
+```
+
+### Step 6: Verify the Beacon Node is Running
+
+```bash
+# Check status
+./node.sh status
+
+# Check logs
+./node.sh logs cl
+
+# Test beacon API
+curl http://localhost:5052/eth/v1/node/health
+```
+
+Your Beacon Node is now running!
 
 ---
 
-**Homychain** - Made with love, by Uncle Os and Xangnam - LAOITDEV Team
+## Run a Validator (VC Only)
+
+Run a Validator Client if you have access to an external Beacon Node and want to participate in consensus.
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/YOUR_ORG/labchain.git
+cd labchain
+```
+
+### Step 2: Create Docker Network
+
+```bash
+docker network create labchain-net
+```
+
+### Step 3: Generate Validator Keystores
+
+Use the provided script to generate validator keys:
+
+```bash
+cd VC
+
+# Generate 1 validator with your withdrawal address
+./manage-validators.sh \
+  --count 1 \
+  --withdrawal 0xYOUR_ETH_ADDRESS \
+  --output ./output \
+  --managed-root ./my-keystores
+```
+
+**Script options:**
+- `--count <number>` - Number of validators to create (default: 64)
+- `--withdrawal <address>` - Your ETH address for withdrawals
+- `--output <dir>` - Where to save output files (default: ./output)
+- `--managed-root <dir>` - Where to save keystores (default: ./managed-keystores)
+- `--first-index <number>` - Starting validator index (default: 0)
+
+This creates:
+- `./output/deposits.json` - Deposit data for broadcasting
+- `./output/validators.json` - Full validator info
+- `./my-keystores/validators/` - Keystore files
+- `./my-keystores/secrets/` - Password files
+
+### Step 4: Fund Your Validators (Deposit 32 ETH)
+
+You need 32 ETH per validator. Use the deposit script:
+
+```bash
+# First, make sure you have ETH in your wallet
+# Then broadcast the deposits
+
+./broadcast-deposits.sh \
+  --rpc http://localhost:8545 \
+  --deposits ./output/deposits.json \
+  --from 0xYOUR_FUNDED_ADDRESS \
+  --chain-id 5222 \
+  --private-key YOUR_PRIVATE_KEY_HEX \
+  --contract 0x5454545454545454545454545454545454545454
+```
+
+**Script options:**
+- `--rpc <url>` - EL RPC endpoint
+- `--deposits <file>` - Path to deposits.json from Step 3
+- `--from <address>` - Your funded wallet address
+- `--chain-id <id>` - Network chain ID (5222 for LabChain)
+- `--private-key <hex>` - Private key of funded wallet (no 0x prefix)
+- `--contract <address>` - Deposit contract address
+- `--dry-run` - Preview transactions without sending
+
+**Note:** Each deposit costs 32 ETH. Wait for deposits to be processed (about 16 hours).
+
+### Step 5: Configure VC Environment
+
+```bash
+cd VC
+cp .env.example .env   # if exists, or create new
+```
+
+Edit `VC/.env`:
+
+```bash
+# VC/.env
+LIGHTHOUSE_IMAGE=sigp/lighthouse:latest
+LIGHTHOUSE_LOG_LEVEL=info
+
+# Connect to your Beacon Node
+BEACON_NODE_ENDPOINTS=http://BEACON_NODE_IP:5052
+
+# Path to your keystores from Step 3
+KEYSTORE_DIR=./my-keystores
+
+# Your fee recipient address (for MEV/tips)
+FEE_RECIPIENT=0xYOUR_ETH_ADDRESS
+```
+
+### Step 6: Start the Validator Client
+
+```bash
+cd ..
+./node.sh start vc
+```
+
+### Step 7: Verify Your Validator is Running
+
+```bash
+# Check status
+./node.sh status
+
+# Check logs
+./node.sh logs vc
+```
+
+Look for these messages in the logs:
+- `Enabled validator` - Your validator is loaded
+- `Successfully published attestation` - Validator is attesting (after activation)
+- `Successfully published block` - Validator proposed a block
+
+**Note:** After depositing, validators need to wait in the activation queue (typically 16-24 hours).
+
+---
+
+## Useful Commands
+
+### Node Management
+
+```bash
+# Start nodes
+./node.sh start el      # Start Execution Layer
+./node.sh start cl      # Start Consensus Layer
+./node.sh start vc      # Start Validator Client
+./node.sh start all     # Start all nodes
+
+# Stop nodes
+./node.sh stop el
+./node.sh stop cl
+./node.sh stop vc
+./node.sh stop all
+
+# Restart nodes
+./node.sh restart el
+./node.sh restart cl
+./node.sh restart vc
+./node.sh restart all
+
+# View logs
+./node.sh logs el
+./node.sh logs cl
+./node.sh logs vc
+./node.sh logs all
+
+# Check status
+./node.sh status
+```
+
+### Check Sync Status
+
+```bash
+# EL sync status
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+  http://localhost:8545
+
+# CL sync status
+curl http://localhost:5052/eth/v1/node/syncing
+```
+
+### Get Current Block/Slot
+
+```bash
+# Current EL block
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+
+# Current CL slot
+curl http://localhost:5052/eth/v1/beacon/headers/head
+```
+
+---
+
+## Troubleshooting
+
+### EL won't start
+
+**Check genesis is initialized:**
+```bash
+ls EL/data/.genesis_applied
+```
+
+**Check logs:**
+```bash
+./node.sh logs el
+```
+
+**Verify genesis file exists:**
+```bash
+ls config/metadata/genesis.json
+```
+
+### CL can't connect to EL
+
+**Verify JWT secrets match:**
+```bash
+# Both should show same content
+cat config/jwt/jwtsecret
+```
+
+**Check EL is running:**
+```bash
+./node.sh status
+curl http://localhost:8545
+```
+
+**Check network:**
+```bash
+docker network ls | grep labchain
+```
+
+### Validator not producing attestations
+
+**Check beacon node is synced:**
+```bash
+curl http://localhost:5052/eth/v1/node/syncing
+# Should return {"data":{"is_syncing":false,...}}
+```
+
+**Verify keystores are loaded:**
+```bash
+./node.sh logs vc | grep "Enabled validator"
+```
+
+**Check validator activation status:**
+Your validator needs to be activated on-chain. This takes about 16-24 hours after deposit.
+
+### Peer discovery issues
+
+**Check your public IP is correct:**
+```bash
+curl ifconfig.me
+```
+
+**Verify firewall allows P2P ports:**
+- EL: 30303 (TCP/UDP)
+- CL: 9000 (TCP/UDP)
+
+**Check peer count:**
+```bash
+# EL peers
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' \
+  http://localhost:8545
+
+# CL peers
+curl http://localhost:5052/eth/v1/node/peer_count
+```
+
+---
+
+## Support
+
+If you need help:
+- Check the [troubleshooting section](#troubleshooting)
+- Contact network administrators
+- Join our community channels
+
+---
+
+**LabChain** - Made with love by LAOITDEV Team
