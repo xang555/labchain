@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Homychain Node Management Script
+# LabChain Node Management Script
 # Easy control for Execution Layer (EL), Consensus Layer (CL), and Validator Client (VC)
 
 set -e
@@ -23,20 +23,18 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # Usage information
 usage() {
   cat <<'EOF'
-Homychain Node Manager
+LabChain Node Manager
 
 USAGE:
-  ./node.sh <command> [options]
+  ./node.sh <command> [node]
 
 COMMANDS:
-  start <node> [profile]    Start a node
-  stop <node> [profile]     Stop a node
-  restart <node> [profile]  Restart a node
-  logs <node> [profile]     View node logs (follow mode)
-  status                    Show status of all nodes
-  init                      Initialize network (generate genesis + start all)
-  clean <target>            Clean data directories
-  health                    Check network health
+  start <node>      Start a node
+  stop <node>       Stop a node
+  restart <node>    Restart a node
+  logs <node>       View node logs (follow mode)
+  status            Show status of all nodes
+  health            Check network health
 
 NODES:
   el      Execution Layer (Reth)
@@ -44,57 +42,47 @@ NODES:
   vc      Validator Client (Lighthouse VC)
   all     All nodes
 
-CLEAN TARGETS:
-  el      Clean EL data directory only
-  cl      Clean CL data directory only
-  vc      Clean VC data directory only
-  config  Clean all generated config (genesis, keys, jwt, data)
-  all     Clean everything (config + all data)
-
-PROFILES:
-  For EL and CL:
-    bootnode    Bootnode (first node in network)
-    default     Regular node (connects to bootnode)
-
-  For VC:
-    genesis     Genesis validators (from genesis generation)
-    managed     Managed validators (imported separately)
-
 EXAMPLES:
-  ./node.sh start all              # Start all bootnodes (EL, CL, VC genesis)
-  ./node.sh start el bootnode      # Start EL bootnode
-  ./node.sh stop vc genesis        # Stop genesis validator client
-  ./node.sh logs cl bootnode       # View CL bootnode logs
-  ./node.sh status                 # Check status of all nodes
-  ./node.sh init                   # Full initialization (genesis + start)
-  ./node.sh clean all              # Clean everything (stop nodes + delete all data)
-  ./node.sh clean el               # Clean only EL chain data
-  ./node.sh clean config           # Clean generated config (requires regenerating genesis)
+  ./node.sh start all         # Start all nodes (EL, CL, VC)
+  ./node.sh start el          # Start only EL
+  ./node.sh stop vc           # Stop validator client
+  ./node.sh logs cl           # View CL logs
+  ./node.sh status            # Check status of all nodes
 
-WORKFLOW:
-  1. Generate genesis:  ./genesis/gen.sh
-  2. Initialize:        ./node.sh init
-  3. Check status:      ./node.sh status
-  4. View logs:         ./node.sh logs all
+ENVIRONMENT VARIABLES:
+  EL:
+    BOOTNODES           - Comma-separated list of EL bootnodes (enode://...)
+    EL_DATA_DIR         - Path to EL data directory
+    GENESIS_DIR         - Path to genesis files
+    JWT_SECRET          - Path to JWT secret file
 
-For more help, see NODE_MANAGEMENT.md
+  CL:
+    BOOT_NODES          - Comma-separated list of CL bootnodes (enr:...)
+    EXECUTION_ENDPOINT  - URL of execution layer RPC
+    CL_DATA_DIR         - Path to CL data directory
+    CONSENSUS_DIR       - Path to consensus config files
+
+  VC:
+    KEYSTORE_DIR        - Path to validator keystores (required)
+    BEACON_NODE_ENDPOINTS - URL of beacon node API
+    FEE_RECIPIENT       - Fee recipient address
+
 EOF
 }
 
 # Get docker compose command for a node
 get_compose_cmd() {
   local node=$1
-  local profile=${2:-bootnode}
 
   case $node in
     el)
-      echo "docker compose -f EL/docker-compose.yml --profile $profile"
+      echo "docker compose -f EL/docker-compose.yml"
       ;;
     cl)
-      echo "docker compose -f CL/docker-compose.yml --profile $profile"
+      echo "docker compose -f CL/docker-compose.yml"
       ;;
     vc)
-      echo "docker compose -f VC/docker-compose.yml --profile $profile"
+      echo "docker compose -f VC/docker-compose.yml"
       ;;
     *)
       error "Unknown node: $node"
@@ -106,21 +94,20 @@ get_compose_cmd() {
 # Start a node
 start_node() {
   local node=$1
-  local profile=${2:-bootnode}
 
   if [ "$node" = "all" ]; then
     info "Starting all nodes..."
-    start_node el bootnode
+    start_node el
     sleep 5
-    start_node cl bootnode
+    start_node cl
     sleep 5
-    start_node vc genesis
+    start_node vc
     success "All nodes started"
     return 0
   fi
 
-  info "Starting $node (profile: $profile)..."
-  local cmd=$(get_compose_cmd "$node" "$profile")
+  info "Starting $node..."
+  local cmd=$(get_compose_cmd "$node")
   eval "$cmd up -d"
   success "$node started"
 }
@@ -128,22 +115,18 @@ start_node() {
 # Stop a node
 stop_node() {
   local node=$1
-  local profile=${2:-bootnode}
 
   if [ "$node" = "all" ]; then
     info "Stopping all nodes..."
-    stop_node vc genesis 2>/dev/null || true
-    stop_node vc managed 2>/dev/null || true
-    stop_node cl bootnode 2>/dev/null || true
-    stop_node cl default 2>/dev/null || true
-    stop_node el bootnode 2>/dev/null || true
-    stop_node el default 2>/dev/null || true
+    stop_node vc 2>/dev/null || true
+    stop_node cl 2>/dev/null || true
+    stop_node el 2>/dev/null || true
     success "All nodes stopped"
     return 0
   fi
 
-  info "Stopping $node (profile: $profile)..."
-  local cmd=$(get_compose_cmd "$node" "$profile")
+  info "Stopping $node..."
+  local cmd=$(get_compose_cmd "$node")
   eval "$cmd down" 2>/dev/null || warn "$node was not running"
   success "$node stopped"
 }
@@ -151,7 +134,6 @@ stop_node() {
 # Restart a node
 restart_node() {
   local node=$1
-  local profile=${2:-bootnode}
 
   if [ "$node" = "all" ]; then
     info "Restarting all nodes..."
@@ -162,17 +144,16 @@ restart_node() {
     return 0
   fi
 
-  info "Restarting $node (profile: $profile)..."
-  stop_node "$node" "$profile"
+  info "Restarting $node..."
+  stop_node "$node"
   sleep 2
-  start_node "$node" "$profile"
+  start_node "$node"
   success "$node restarted"
 }
 
 # View logs
 view_logs() {
   local node=$1
-  local profile=${2:-bootnode}
 
   if [ "$node" = "all" ]; then
     info "Showing logs for all running nodes..."
@@ -184,8 +165,8 @@ view_logs() {
     return 0
   fi
 
-  info "Showing logs for $node (profile: $profile) - Press Ctrl+C to exit"
-  local cmd=$(get_compose_cmd "$node" "$profile")
+  info "Showing logs for $node - Press Ctrl+C to exit"
+  local cmd=$(get_compose_cmd "$node")
   eval "$cmd logs -f --tail=100"
 }
 
@@ -215,8 +196,8 @@ show_status() {
 
   # Check CL
   echo -e "${BLUE}=== Consensus Layer (CL) ===${NC}"
-  if docker ps --filter "name=lighthouse" --filter "name=bootnode" --format "table {{.Names}}\t{{.Status}}" | grep -q lighthouse; then
-    docker ps --filter "name=lighthouse" --filter "name=bootnode" --format "table {{.Names}}\t{{.Status}}"
+  if docker ps --filter "name=lighthouse" --format "table {{.Names}}\t{{.Status}}" | grep -q lighthouse; then
+    docker ps --filter "name=lighthouse" --format "table {{.Names}}\t{{.Status}}" | grep -v "\-vc"
 
     # Get head slot
     if curl -s http://localhost:5052/eth/v1/node/health > /dev/null 2>&1; then
@@ -232,12 +213,7 @@ show_status() {
   echo -e "${BLUE}=== Validator Client (VC) ===${NC}"
   if docker ps --filter "name=lighthouse-vc" --format "table {{.Names}}\t{{.Status}}" | grep -q lighthouse-vc; then
     docker ps --filter "name=lighthouse-vc" --format "table {{.Names}}\t{{.Status}}"
-
-    # Count validators
-    VC_COUNT=$(docker logs lighthouse-vc-genesis 2>&1 | grep -i "enabled: true" | wc -l | tr -d ' ')
-    if [ "$VC_COUNT" -gt 0 ]; then
-      echo -e "  ${GREEN}✓${NC} Active validators: $VC_COUNT"
-    fi
+    echo -e "  ${GREEN}✓${NC} Validator client running"
   else
     echo -e "  ${RED}✗${NC} Not running"
   fi
@@ -254,186 +230,6 @@ check_health() {
   fi
 
   ./check-engine-api.sh
-}
-
-# Full initialization
-init_network() {
-  info "Initializing Homychain network..."
-  echo ""
-
-  # Check if genesis exists
-  if [ ! -f "config/metadata/genesis.json" ]; then
-    error "Genesis not found! Run './genesis/gen.sh' first"
-    exit 1
-  fi
-
-  # Check if data directories are clean
-  if [ -d "config/el-data" ] && [ "$(ls -A config/el-data 2>/dev/null)" ]; then
-    warn "EL data directory is not empty"
-    read -p "Clear existing data? (yes/no): " -r
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-      rm -rf config/el-data/*
-      success "EL data cleared"
-    fi
-  fi
-
-  if [ -d "config/cl-data" ] && [ "$(ls -A config/cl-data 2>/dev/null)" ]; then
-    warn "CL data directory is not empty"
-    read -p "Clear existing data? (yes/no): " -r
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-      rm -rf config/cl-data/*
-      success "CL data cleared"
-    fi
-  fi
-
-  # Create directories
-  mkdir -p config/el-data config/cl-data config/vc-data/genesis config/vc-data/managed
-
-  # Start nodes
-  info "Starting EL bootnode..."
-  start_node el bootnode
-  sleep 10
-
-  info "Starting CL bootnode..."
-  start_node cl bootnode
-  sleep 15
-
-  info "Starting VC (genesis validators)..."
-  start_node vc genesis
-  sleep 5
-
-  success "Network initialized!"
-  echo ""
-  info "Checking status..."
-  show_status
-}
-
-# Clean data directories
-clean_data() {
-  local target=$1
-
-  case $target in
-    el)
-      warn "This will delete all EL (Reth) blockchain data!"
-      read -p "Are you sure? (yes/no): " -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        info "Aborted"
-        return 0
-      fi
-
-      info "Stopping EL nodes..."
-      stop_node el bootnode 2>/dev/null || true
-      stop_node el default 2>/dev/null || true
-
-      info "Cleaning EL data..."
-      rm -rf config/el-data/*
-      success "EL data cleaned"
-      ;;
-
-    cl)
-      warn "This will delete all CL (Lighthouse) beacon chain data!"
-      read -p "Are you sure? (yes/no): " -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        info "Aborted"
-        return 0
-      fi
-
-      info "Stopping CL nodes..."
-      stop_node cl bootnode 2>/dev/null || true
-      stop_node cl default 2>/dev/null || true
-
-      info "Cleaning CL data..."
-      rm -rf config/cl-data/*
-      success "CL data cleaned"
-      ;;
-
-    vc)
-      warn "This will delete all VC (Validator Client) data!"
-      read -p "Are you sure? (yes/no): " -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        info "Aborted"
-        return 0
-      fi
-
-      info "Stopping VC nodes..."
-      stop_node vc genesis 2>/dev/null || true
-      stop_node vc managed 2>/dev/null || true
-
-      info "Cleaning VC data..."
-      rm -rf config/vc-data/*
-      success "VC data cleaned"
-      ;;
-
-    config)
-      warn "This will delete ALL generated configuration files!"
-      warn "You will need to regenerate genesis after this."
-      echo ""
-      warn "This will delete:"
-      warn "  - config/metadata/ (genesis.json, config.yaml)"
-      warn "  - config/keystores/ (validator keys)"
-      warn "  - config/jwt/ (JWT secret)"
-      warn "  - config/el-data/ (EL blockchain data)"
-      warn "  - config/cl-data/ (CL beacon chain data)"
-      warn "  - config/vc-data/ (VC data)"
-      echo ""
-      read -p "Are you sure? (yes/no): " -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        info "Aborted"
-        return 0
-      fi
-
-      info "Stopping all nodes..."
-      stop_node all
-
-      info "Cleaning all generated config..."
-      rm -rf config/metadata/*
-      rm -rf config/keystores/*
-      rm -rf config/jwt/*
-      rm -rf config/el-data/*
-      rm -rf config/cl-data/*
-      rm -rf config/vc-data/*
-
-      success "All generated config cleaned"
-      info "To restart, run: ./genesis/gen.sh && ./node.sh init"
-      ;;
-
-    all)
-      warn "This will stop all nodes and delete ALL data and configuration!"
-      warn "This includes genesis, keystores, JWT secrets, and all blockchain data."
-      echo ""
-      read -p "Are you sure? (yes/no): " -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-        info "Aborted"
-        return 0
-      fi
-
-      info "Stopping all nodes..."
-      stop_node all
-
-      info "Cleaning all data and config..."
-      rm -rf config/metadata/*
-      rm -rf config/keystores/*
-      rm -rf config/jwt/*
-      rm -rf config/el-data/*
-      rm -rf config/cl-data/*
-      rm -rf config/vc-data/*
-
-      success "All data and config cleaned"
-      info "To restart, run: ./genesis/gen.sh && ./node.sh init"
-      ;;
-
-    *)
-      error "Unknown clean target: $target"
-      echo ""
-      info "Valid targets: el, cl, vc, config, all"
-      exit 1
-      ;;
-  esac
 }
 
 # Main command handler
@@ -480,21 +276,6 @@ main() {
       ;;
     health)
       check_health
-      ;;
-    init)
-      init_network
-      ;;
-    clean)
-      if [ $# -eq 0 ]; then
-        error "Please specify a clean target (el/cl/vc/config/all)"
-        echo ""
-        info "Examples:"
-        info "  ./node.sh clean el      - Clean only EL data"
-        info "  ./node.sh clean config  - Clean all generated config"
-        info "  ./node.sh clean all     - Clean everything"
-        exit 1
-      fi
-      clean_data "$@"
       ;;
     -h|--help|help)
       usage
