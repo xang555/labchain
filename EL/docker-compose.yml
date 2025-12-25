@@ -37,7 +37,7 @@ services:
         --port ${P2P_PORT:-30303} \
         --discovery.port ${P2P_PORT:-30303} \
         --discovery.addr 0.0.0.0 \
-        ${BOOTNODES:+--bootnodes $BOOTNODES}
+        --bootnodes ${BOOTNODE_ENODE:?Set BOOTNODE_ENODE in .env (see get-bootnode-enode.sh)}
     volumes:
       - ${EL_DATA_DIR:-./data}:/data
       - ${GENESIS_DIR:-../config/metadata}:/chainspec:ro

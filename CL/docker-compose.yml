@@ -29,7 +29,7 @@ services:
           --enr-tcp-port ${P2P_PORT:-9000} \
           --target-peers ${TARGET_PEERS:-100} \
           --allow-insecure-genesis-sync \
-          ${BOOT_NODES:+--boot-nodes $BOOT_NODES} \
+          --boot-nodes ${BOOTNODE_ENR:?Set BOOTNODE_ENR in .env (see get-bootnode-enr.sh)} \
           ${EXTRA_LIGHTHOUSE_FLAGS:-}
     volumes:
       - ${CL_DATA_DIR:-./data}:/data
