@@ -56,4 +56,4 @@ services:
 
 networks:
   labchain-net:
-    name: labchain-net
+    external: true
