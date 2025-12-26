@@ -128,6 +128,16 @@ Use the `./node.sh` script to configure and manage all nodes.
 ./node.sh init el
 ```
 
+Configuration options:
+
+| Config | Default |
+|--------|---------|
+| JSON-RPC HTTP port | `8545` |
+| WebSocket RPC port | `8546` |
+| Auth RPC port (engine API for CL) | `8551` |
+| P2P networking port | `30303` |
+| Bootnode enode URL for peer discovery | Pre-configured |
+
 **2. Start EL:**
 ```bash
 ./node.sh start el
@@ -151,6 +161,19 @@ curl -X POST -H "Content-Type: application/json" \
 ```bash
 ./node.sh init cl
 ```
+
+Configuration options:
+
+| Config | Default |
+|--------|---------|
+| Execution engine endpoint (Reth engine API) | `http://reth-node:8551` |
+| Beacon HTTP API port | `5052` |
+| P2P networking port | `9000` |
+| Target number of peers to connect | `64` |
+| Your public IP for P2P discovery | Auto-detected |
+| Discovery protocol (`enr` or `libp2p`) | `enr` |
+| ENR bootnode addresses (if using ENR mode) | Pre-configured |
+| libp2p bootnode addresses (if using libp2p mode) | Pre-configured |
 
 **2. Start CL:**
 ```bash
@@ -233,7 +256,17 @@ cd ..
 
 # Configure VC (optional - defaults are ready to use)
 ./node.sh init vc
+```
 
+Configuration options:
+
+| Config | Default |
+|--------|---------|
+| Beacon node REST API endpoints (comma-separated) | `http://lighthouse-bn:5052` |
+| Fee recipient address for block proposals | `0x0000...0000` |
+| Root directory for validator keystores | `./managed-keystores` |
+
+```bash
 # Start VC
 ./node.sh start vc
 ```
