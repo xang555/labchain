@@ -11,8 +11,8 @@ Welcome to LabChain! This guide will help you join our network as a node operato
 - [Network Information](#network-information)
 - [Getting Started](#getting-started)
 - [Running Nodes](#running-nodes)
-- [Node Management](#node-management)
 - [Becoming a Validator](#becoming-a-validator)
+- [Node Management](#node-management)
 
 ---
 
@@ -167,79 +167,6 @@ curl http://localhost:5052/eth/v1/node/syncing
 
 ---
 
-## Node Management
-
-The `./node.sh` script provides all commands for managing your nodes.
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `./node.sh init <node>` | Configure a node interactively (optional) |
-| `./node.sh start <node>` | Start a node |
-| `./node.sh stop <node>` | Stop a node |
-| `./node.sh restart <node>` | Restart a node |
-| `./node.sh logs <node>` | View node logs (follow mode) |
-| `./node.sh status` | Show status of all nodes |
-| `./node.sh health` | Check network health |
-
-### Node Options
-
-| Node | Description |
-|------|-------------|
-| `el` | Execution Layer (Reth) |
-| `cl` | Consensus Layer (Lighthouse Beacon) |
-| `vc` | Validator Client (Lighthouse VC) |
-| `all` | All nodes |
-
-### Examples
-
-```bash
-# Start EL with default settings
-./node.sh start el
-
-# Start all nodes
-./node.sh start all
-
-# Stop validator client
-./node.sh stop vc
-
-# View CL logs
-./node.sh logs cl
-
-# Check status of all nodes
-./node.sh status
-
-# Restart CL
-./node.sh restart cl
-```
-
-### Check Sync Status
-
-```bash
-# EL sync status
-curl -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
-  http://localhost:8545
-
-# CL sync status
-curl http://localhost:5052/eth/v1/node/syncing
-```
-
-### Get Current Block/Slot
-
-```bash
-# Current EL block
-curl -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-  http://localhost:8545
-
-# Current CL slot
-curl http://localhost:5052/eth/v1/beacon/headers/head
-```
-
----
-
 ## Becoming a Validator
 
 To become a validator, you need to:
@@ -324,6 +251,79 @@ Look for these messages in the logs:
 
 ---
 
+## Node Management
+
+The `./node.sh` script provides all commands for managing your nodes.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `./node.sh init <node>` | Configure a node interactively (optional) |
+| `./node.sh start <node>` | Start a node |
+| `./node.sh stop <node>` | Stop a node |
+| `./node.sh restart <node>` | Restart a node |
+| `./node.sh logs <node>` | View node logs (follow mode) |
+| `./node.sh status` | Show status of all nodes |
+| `./node.sh health` | Check network health |
+
+### Node Options
+
+| Node | Description |
+|------|-------------|
+| `el` | Execution Layer (Reth) |
+| `cl` | Consensus Layer (Lighthouse Beacon) |
+| `vc` | Validator Client (Lighthouse VC) |
+| `all` | All nodes |
+
+### Examples
+
+```bash
+# Start EL with default settings
+./node.sh start el
+
+# Start all nodes
+./node.sh start all
+
+# Stop validator client
+./node.sh stop vc
+
+# View CL logs
+./node.sh logs cl
+
+# Check status of all nodes
+./node.sh status
+
+# Restart CL
+./node.sh restart cl
+```
+
+### Check Sync Status
+
+```bash
+# EL sync status
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+  http://localhost:8545
+
+# CL sync status
+curl http://localhost:5052/eth/v1/node/syncing
+```
+
+### Get Current Block/Slot
+
+```bash
+# Current EL block
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+
+# Current CL slot
+curl http://localhost:5052/eth/v1/beacon/headers/head
+```
+
+---
+
 ## Support
 
 If you need help:
@@ -332,4 +332,4 @@ If you need help:
 
 ---
 
-**LabChain** - Made with love by LAOITDEV Team
+**LabChain** - LAO Blockchain Made with love, by Uncle Os555 and Xangnam - LAOITDEV Team
