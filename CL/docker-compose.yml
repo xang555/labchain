@@ -14,6 +14,32 @@ services:
       - -c
       - |
         set -eu
+
+        # Build bootnode flags based on DISCOVERY_MODE
+        BOOTNODE_FLAGS=""
+        case "${DISCOVERY_MODE:-enr}" in
+          enr)
+            if [ -n "${BOOTNODE_ENR:-}" ]; then
+              BOOTNODE_FLAGS="--boot-nodes ${BOOTNODE_ENR}"
+            else
+              echo "ERROR: DISCOVERY_MODE=enr but BOOTNODE_ENR is not set"
+              exit 1
+            fi
+            ;;
+          libp2p)
+            if [ -n "${BOOTNODE_LIBP2P:-}" ]; then
+              BOOTNODE_FLAGS="--libp2p-addresses ${BOOTNODE_LIBP2P}"
+            else
+              echo "ERROR: DISCOVERY_MODE=libp2p but BOOTNODE_LIBP2P is not set"
+              exit 1
+            fi
+            ;;
+          *)
+            echo "ERROR: Invalid DISCOVERY_MODE '${DISCOVERY_MODE}'. Use 'enr' or 'libp2p'"
+            exit 1
+            ;;
+        esac
+
         exec lighthouse bn \
           --testnet-dir /consensus \
           --execution-endpoint ${EXECUTION_ENDPOINT:-http://reth:8551} \
@@ -31,7 +57,7 @@ services:
           --disable-discovery \
           --target-peers ${TARGET_PEERS:-100} \
           --allow-insecure-genesis-sync \
-          --boot-nodes ${BOOTNODE_ENR:?Set BOOTNODE_ENR in .env (see get-bootnode-enr.sh)} \
+          $BOOTNODE_FLAGS \
           ${EXTRA_LIGHTHOUSE_FLAGS:-}
     volumes:
       - ${CL_DATA_DIR:-./data}:/data
