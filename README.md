@@ -201,6 +201,14 @@ To become a validator, you need to:
 
 ### Step 1: Generate Validator Keystores
 
+First, generate a mnemonic (24-word recovery phrase) if you don't have one:
+```bash
+# You can use any BIP-39 mnemonic generator, or create one with:
+# https://iancoleman.io/bip39/
+```
+
+**Important:** Save your mnemonic securely! This is the only way to recover your validator keys.
+
 ```bash
 cd VC
 
@@ -211,6 +219,8 @@ cd VC
   --output ./output \
   --managed-root ./my-keystores
 ```
+
+The script will prompt you to enter your mnemonic phrase.
 
 **Script options:**
 - `--count <number>` - Number of validators to create (default: 64)
