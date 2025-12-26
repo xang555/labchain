@@ -1,5 +1,5 @@
 services:
-  reth:
+  reth-node:
     image: ${RETH_IMAGE:-ghcr.io/paradigmxyz/reth:latest}
     restart: unless-stopped
     networks:

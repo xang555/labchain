@@ -1,5 +1,5 @@
 services:
-  lighthouse:
+  lighthouse-bn:
     image: ${LIGHTHOUSE_IMAGE:-sigp/lighthouse:latest}
     restart: unless-stopped
     env_file:
