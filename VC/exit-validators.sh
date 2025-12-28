@@ -195,6 +195,65 @@ get_validator_status() {
     echo "$response" | jq -r '.data.status // "unknown"' 2>/dev/null || echo "unknown"
 }
 
+get_validator_activation_epoch() {
+    local beacon_url="$1"
+    local pubkey="$2"
+
+    local response
+    response=$(get_validator_info "$beacon_url" "$pubkey")
+    echo "$response" | jq -r '.data.validator.activation_epoch // "0"' 2>/dev/null || echo "0"
+}
+
+get_current_epoch() {
+    local beacon_url="$1"
+
+    local response
+    response=$(curl -s "${beacon_url}/eth/v1/beacon/headers/head" 2>/dev/null || echo "{}")
+    local slot
+    slot=$(echo "$response" | jq -r '.data.header.message.slot // "0"' 2>/dev/null || echo "0")
+
+    # Epoch = slot / 32 (slots per epoch)
+    echo $((slot / 32))
+}
+
+check_exit_eligibility() {
+    local beacon_url="$1"
+    local pubkey="$2"
+
+    # Constants (standard Ethereum PoS)
+    local SHARD_COMMITTEE_PERIOD=256  # Minimum epochs before exit is allowed
+
+    local current_epoch
+    current_epoch=$(get_current_epoch "$beacon_url")
+
+    local activation_epoch
+    activation_epoch=$(get_validator_activation_epoch "$beacon_url" "$pubkey")
+
+    # Check if activation_epoch is valid
+    if [[ "$activation_epoch" == "0" || "$activation_epoch" == "null" || -z "$activation_epoch" ]]; then
+        echo "unknown"
+        return
+    fi
+
+    local eligible_epoch=$((activation_epoch + SHARD_COMMITTEE_PERIOD))
+
+    if [[ $current_epoch -ge $eligible_epoch ]]; then
+        echo "eligible"
+    else
+        local epochs_remaining=$((eligible_epoch - current_epoch))
+        # Each epoch is ~6.4 minutes (32 slots * 12 seconds)
+        local minutes_remaining=$((epochs_remaining * 32 * 12 / 60))
+        local hours_remaining=$((minutes_remaining / 60))
+        local mins=$((minutes_remaining % 60))
+
+        if [[ $hours_remaining -gt 0 ]]; then
+            echo "not_eligible:${eligible_epoch}:~${hours_remaining}h ${mins}m"
+        else
+            echo "not_eligible:${eligible_epoch}:~${minutes_remaining}m"
+        fi
+    fi
+}
+
 get_validator_index() {
     local beacon_url="$1"
     local pubkey="$2"
@@ -250,11 +309,12 @@ display_validators() {
 
     local idx=1
     for pubkey in "${pubkeys[@]}"; do
-        local status balance index withdrawal_addr
+        local status balance index withdrawal_addr eligibility
         status=$(get_validator_status "$beacon_url" "$pubkey")
         balance=$(get_validator_balance "$beacon_url" "$pubkey")
         index=$(get_validator_index "$beacon_url" "$pubkey")
         withdrawal_addr=$(get_withdrawal_address "$beacon_url" "$pubkey")
+        eligibility=$(check_exit_eligibility "$beacon_url" "$pubkey")
 
         # Status color
         local status_color="${NC}"
@@ -265,12 +325,27 @@ display_validators() {
             *) status_color="${RED}" ;;
         esac
 
+        # Eligibility display
+        local eligibility_display=""
+        if [[ "$eligibility" == "eligible" ]]; then
+            eligibility_display="${GREEN}Eligible for exit${NC}"
+        elif [[ "$eligibility" == "unknown" ]]; then
+            eligibility_display="${YELLOW}Unknown${NC}"
+        else
+            # Parse not_eligible:epoch:time_remaining
+            local eligible_epoch time_remaining
+            eligible_epoch=$(echo "$eligibility" | cut -d':' -f2)
+            time_remaining=$(echo "$eligibility" | cut -d':' -f3)
+            eligibility_display="${RED}Not eligible until epoch ${eligible_epoch} (${time_remaining})${NC}"
+        fi
+
         echo -e "  ${BOLD}[$idx]${NC} ${pubkey:0:20}...${pubkey: -8}"
         echo -e "      Index: ${index} | Status: ${status_color}${status}${NC} | Balance: ${balance} LAB"
         echo -e "      Withdrawal: ${withdrawal_addr}"
+        echo -e "      Exit eligibility: ${eligibility_display}"
         echo ""
 
-        ((idx++))
+        idx=$((idx + 1))
     done
 }
 
@@ -511,10 +586,37 @@ main() {
     echo ""
 
     echo "  Selected validators:"
+    local eligible_count=0
+    local not_eligible_count=0
     for pk in "${SELECTED_PUBKEYS[@]}"; do
-        echo "    - ${pk:0:20}...${pk: -8}"
+        local elig
+        elig=$(check_exit_eligibility "$BEACON_URL" "$pk")
+        if [[ "$elig" == "eligible" ]]; then
+            echo -e "    ${GREEN}✓${NC} ${pk:0:20}...${pk: -8} - Eligible"
+            eligible_count=$((eligible_count + 1))
+        elif [[ "$elig" == "unknown" ]]; then
+            echo -e "    ${YELLOW}?${NC} ${pk:0:20}...${pk: -8} - Unknown"
+        else
+            local time_remaining
+            time_remaining=$(echo "$elig" | cut -d':' -f3)
+            echo -e "    ${RED}✗${NC} ${pk:0:20}...${pk: -8} - Not eligible (${time_remaining})"
+            not_eligible_count=$((not_eligible_count + 1))
+        fi
     done
     echo ""
+
+    if [[ $not_eligible_count -gt 0 ]]; then
+        echo -e "  ${YELLOW}Note: ${not_eligible_count} validator(s) are not yet eligible and will be skipped.${NC}"
+        echo ""
+    fi
+
+    if [[ $eligible_count -eq 0 ]]; then
+        echo -e "  ${RED}No validators are currently eligible for exit.${NC}"
+        echo -e "  ${YELLOW}Validators must be active for ~27 hours before they can exit.${NC}"
+        echo ""
+        info "Exiting..."
+        exit 0
+    fi
 
     echo -e "  ${YELLOW}To confirm, type '${BOLD}yes${NC}${YELLOW}':${NC}"
     local confirm
@@ -552,22 +654,38 @@ main() {
 
         if [[ "$status" == "exited"* || "$status" == "withdrawal"* ]]; then
             warn "Already exited (status: ${status}). Skipping."
-            ((skip_count++))
+            skip_count=$((skip_count + 1))
             continue
         fi
 
         if [[ "$status" != "active_ongoing" && "$status" != "active_slashed" ]]; then
             warn "Not in active state (status: ${status}). Skipping."
-            ((skip_count++))
+            skip_count=$((skip_count + 1))
+            continue
+        fi
+
+        # Check exit eligibility
+        local eligibility
+        eligibility=$(check_exit_eligibility "$BEACON_URL" "$pubkey")
+
+        if [[ "$eligibility" != "eligible" && "$eligibility" != "unknown" ]]; then
+            local eligible_epoch time_remaining
+            eligible_epoch=$(echo "$eligibility" | cut -d':' -f2)
+            time_remaining=$(echo "$eligibility" | cut -d':' -f3)
+            warn "Not eligible for exit yet!"
+            echo -e "      ${YELLOW}Validator must wait until epoch ${eligible_epoch}${NC}"
+            echo -e "      ${YELLOW}Estimated time remaining: ${time_remaining}${NC}"
+            echo ""
+            skip_count=$((skip_count + 1))
             continue
         fi
 
         if perform_exit "$BEACON_URL" "$KEYSTORE_DIR" "$CONSENSUS_DIR" "$pubkey"; then
             success "Exit broadcast successful!"
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
             error "Exit failed!"
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         fi
 
         # Delay between exits
