@@ -311,6 +311,27 @@ Look for these messages in the logs:
 - `Successfully published attestation` - Validator is attesting (after activation)
 - `Successfully published block` - Validator proposed a block
 
+### Exiting Validators (Withdraw Funds)
+
+To exit your validator and withdraw all funds (stake + rewards), use the exit script:
+
+```bash
+cd VC
+./exit-validators.sh
+```
+
+The script will guide you through the process interactively:
+1. Configure beacon node URL (default: http://localhost:5052)
+2. Configure keystore directory (default: ./managed-keystores)
+3. Select validators to exit (all, specific numbers, or by public key)
+4. Confirm the exit
+
+**Important:** Voluntary exits are **irreversible**. After exit:
+1. Validator enters exit queue
+2. Exit processing (~27 hours minimum)
+3. Withdrawal delay (~27 hours after exit)
+4. Funds (32 LAB + rewards) sent to your withdrawal address
+
 ---
 
 ## Node Management
