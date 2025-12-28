@@ -384,12 +384,4 @@ curl http://localhost:5052/eth/v1/beacon/headers/head
 
 ---
 
-## Support
-
-If you need help:
-- Contact network administrators
-- Join our community channels
-
----
-
 **LAB Chain** - LAO Blockchain Made with love, by Uncle Os555 and Xangnam - LAOITDEV Team
