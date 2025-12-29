@@ -382,6 +382,42 @@ curl -X POST -H "Content-Type: application/json" \
 curl http://localhost:5052/eth/v1/beacon/headers/head
 ```
 
+### Get Bootnode Information
+
+If you're running a bootnode and need to share connection info with other nodes:
+
+**Get EL Bootnode Enode:**
+```bash
+cd EL
+./get-bootnode-enode.sh
+```
+This returns the enode URL (e.g., `enode://abc123...@IP:30303`) that other EL nodes can use to connect.
+
+**Get CL Bootnode ENR:**
+```bash
+cd CL
+./get-bootnode-enr.sh
+```
+This returns the ENR record (e.g., `enr:-...`) that other CL nodes can use for peer discovery.
+
+**Get CL Bootnode libp2p Address:**
+```bash
+# Get libp2p multiaddr from beacon node
+curl -s http://localhost:5052/eth/v1/node/identity | jq -r '.data.p2p_addresses[0]'
+```
+This returns the libp2p multiaddr (e.g., `/ip4/IP/tcp/9000/p2p/PEER_ID`) for nodes using libp2p discovery mode.
+
+**Note:** When sharing bootnode addresses with other operators, replace `127.0.0.1` or `localhost` with your server's public IP address so they can connect to your node.
+
+You can also specify a custom RPC URL:
+```bash
+# Custom EL RPC
+RPC_URL=http://192.168.1.100:8545 ./get-bootnode-enode.sh
+
+# Custom CL RPC
+RPC_URL=http://192.168.1.100:5052 ./get-bootnode-enr.sh
+```
+
 ---
 
 **LAB Chain** - LAO Blockchain Made with love, by Uncle Os555 and Xangnam - LAOITDEV Team
