@@ -111,7 +111,7 @@ Follow these steps to set up your environment before running any node.
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/AIDappLab/labchain.git
+git clone https://github.com/xang555/labchain.git
 cd labchain
 ```
 
