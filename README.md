@@ -193,6 +193,38 @@ Configuration options:
 | Discovery protocol (`enr` or `libp2p`) | `enr` |
 | ENR bootnode addresses (if using ENR mode) | Pre-configured |
 | libp2p bootnode addresses (if using libp2p mode) | Pre-configured |
+| **Sync mode** (`full` or `checkpoint`) | `full` |
+| **Checkpoint sync URL** (required for checkpoint mode) | - |
+
+**Choose Your Sync Mode:**
+
+| Mode | Speed | Storage | When to Use |
+|------|-------|---------|-------------|
+| **Full** | Slower (syncs from genesis) | More | Complete node with full history |
+| **Checkpoint** | Fast (syncs from recent point) | Less | Quick startup, trusted checkpoint |
+
+**Full Sync (Default):**
+```bash
+# SYNC_MODE=full is set by default
+# No additional configuration needed
+./node.sh start cl
+```
+
+**Checkpoint Sync (Recommended for Faster Setup):**
+
+Set checkpoint sync mode during configuration:
+```bash
+./node.sh init cl
+# Select: 2) checkpoint
+# Enter checkpoint URL: https://checkpoin.labchain.la
+```
+
+Or manually edit `CL/.env`:
+```bash
+# CL/.env
+SYNC_MODE=checkpoint
+CHECKPOINT_SYNC_URL=https://checkpoin.labchain.la
+```
 
 **2. Start CL:**
 ```bash
