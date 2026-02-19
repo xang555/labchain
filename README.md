@@ -82,8 +82,8 @@ sudo apt install jq
 ```
 
 **4. Minimum Hardware**
-- CPU: 4 cores
-- RAM: 8 GB
+- CPU: 2 cores
+- RAM: 4 GB
 - Storage: 100 GB SSD
 
 **5. Network Ports** (open in your firewall)
