@@ -40,6 +40,29 @@ services:
             ;;
         esac
 
+        # Build checkpoint sync flags based on SYNC_MODE
+        CHECKPOINT_FLAGS=""
+        GENESIS_SYNC_FLAG=""
+        case "${SYNC_MODE:-full}" in
+          full)
+            # Full sync uses --allow-insecure-genesis-sync (for testnet/dev)
+            GENESIS_SYNC_FLAG="--allow-insecure-genesis-sync"
+            ;;
+          checkpoint)
+            if [ -n "${CHECKPOINT_SYNC_URL:-}" ]; then
+              CHECKPOINT_FLAGS="--checkpoint-sync-url ${CHECKPOINT_SYNC_URL}"
+            else
+              echo "ERROR: SYNC_MODE=checkpoint but CHECKPOINT_SYNC_URL is not set"
+              exit 1
+            fi
+            # Checkpoint sync does NOT use --allow-insecure-genesis-sync
+            ;;
+          *)
+            echo "ERROR: Invalid SYNC_MODE '${SYNC_MODE}'. Use 'full' or 'checkpoint'"
+            exit 1
+            ;;
+        esac
+
         exec lighthouse bn \
           --testnet-dir /consensus \
           --execution-endpoint ${EXECUTION_ENDPOINT:-http://reth:8551} \
@@ -56,8 +79,9 @@ services:
           --disable-enr-auto-update \
           --disable-discovery \
           --target-peers ${TARGET_PEERS:-100} \
-          --allow-insecure-genesis-sync \
+          $$GENESIS_SYNC_FLAG \
           $$BOOTNODE_FLAGS \
+          $$CHECKPOINT_FLAGS \
           ${EXTRA_LIGHTHOUSE_FLAGS:-}
     volumes:
       - ${CL_DATA_DIR:-./data}:/data

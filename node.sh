@@ -192,6 +192,27 @@ prompt_discovery_mode() {
   echo "$selected"
 }
 
+# Prompt for sync mode selection
+prompt_sync_mode() {
+  local default="$1"
+  local selected
+
+  echo -e "  [Sync mode (default: $default)]:" >&2
+  echo -e "    ${GREEN}1)${NC} full - Sync from genesis (slower, full history)" >&2
+  echo -e "    ${GREEN}2)${NC} checkpoint - Sync from checkpoint (faster, requires URL)" >&2
+
+  local selection
+  read -p "  Select [1-2]: " selection
+
+  case "$selection" in
+    1) selected="full" ;;
+    2) selected="checkpoint" ;;
+    *) selected="$default" ;;
+  esac
+
+  echo "$selected"
+}
+
 # Update a variable in .env file
 update_env_var() {
   local env_file="$1"
@@ -425,6 +446,8 @@ init_cl() {
   local cur_discovery_mode=$(get_env_var "$env_file" "DISCOVERY_MODE" "enr")
   local cur_bootnode_enr=$(get_env_var "$env_file" "BOOTNODE_ENR" "")
   local cur_bootnode_libp2p=$(get_env_var "$env_file" "BOOTNODE_LIBP2P" "")
+  local cur_sync_mode=$(get_env_var "$env_file" "SYNC_MODE" "full")
+  local cur_checkpoint_url=$(get_env_var "$env_file" "CHECKPOINT_SYNC_URL" "")
 
   # Prompt for each config
   local new_exec_endpoint=$(prompt_input "Execution engine endpoint (reth engine API)" "$cur_exec_endpoint")
@@ -460,6 +483,22 @@ init_cl() {
   else
     new_bootnode_libp2p="$cur_bootnode_libp2p"
   fi
+  echo ""
+
+  local new_sync_mode=$(prompt_sync_mode "$cur_sync_mode")
+  echo ""
+
+  local new_checkpoint_url
+  if [ "$new_sync_mode" = "checkpoint" ]; then
+    while [ -z "$new_checkpoint_url" ]; do
+      new_checkpoint_url=$(prompt_input "Checkpoint sync URL (e.g., https://checkpoin.labchain.la)" "$cur_checkpoint_url")
+      if [ -z "$new_checkpoint_url" ]; then
+        warn "Checkpoint URL is required when SYNC_MODE=checkpoint"
+      fi
+    done
+  else
+    new_checkpoint_url="$cur_checkpoint_url"
+  fi
 
   # Update .env file
   echo ""
@@ -473,6 +512,8 @@ init_cl() {
   update_env_var "$env_file" "DISCOVERY_MODE" "$new_discovery_mode"
   update_env_var "$env_file" "BOOTNODE_ENR" "$new_bootnode_enr"
   update_env_var "$env_file" "BOOTNODE_LIBP2P" "$new_bootnode_libp2p"
+  update_env_var "$env_file" "SYNC_MODE" "$new_sync_mode"
+  update_env_var "$env_file" "CHECKPOINT_SYNC_URL" "$new_checkpoint_url"
 
   success "CL configuration updated successfully!"
   echo ""
@@ -495,6 +536,12 @@ init_cl() {
   else
     echo -e "  ${GREEN}BOOTNODE_LIBP2P${NC} (libp2p bootnode addresses)"
     echo -e "    → ${new_bootnode_libp2p:-(not set)}"
+  fi
+  echo -e "  ${GREEN}SYNC_MODE${NC} (Sync mode: full or checkpoint)"
+  echo -e "    → $new_sync_mode"
+  if [ "$new_sync_mode" = "checkpoint" ]; then
+    echo -e "  ${GREEN}CHECKPOINT_SYNC_URL${NC} (Checkpoint sync URL)"
+    echo -e "    → ${new_checkpoint_url}"
   fi
 }
 
