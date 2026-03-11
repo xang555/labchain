@@ -1,6 +1,6 @@
 services:
   reth-node:
-    image: ${RETH_IMAGE:-ghcr.io/paradigmxyz/reth:latest}
+    image: ${RETH_IMAGE:-ghcr.io/paradigmxyz/reth:v1.8.3}
     restart: unless-stopped
     networks:
       - labchain-net
