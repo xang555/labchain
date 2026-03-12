@@ -86,7 +86,36 @@ sudo apt install jq
 - RAM: 4 GB
 - Storage: 100 GB SSD
 
-**5. Network Ports** (open in your firewall)
+**5. NTP Time Synchronization**
+
+Blockchain nodes require accurate system time for proper consensus operation. Configure your server to use NTP:
+
+```bash
+# Ubuntu/Debian
+sudo apt install chrony
+sudo systemctl enable chrony
+sudo systemctl start chrony
+
+# Verify time sync
+chronyc tracking
+```
+
+```bash
+# macOS (most systems are already configured)
+brew install chrony
+sudo brew services start chrony
+
+# Verify time sync
+chronyc tracking
+```
+
+```bash
+# Verify time is synchronized (Linux)
+timedatectl status
+# Should show: "System clock synchronized: yes"
+```
+
+**6. Network Ports** (open in your firewall)
 - `30303` (TCP/UDP) - EL peer discovery
 - `9000` (TCP/UDP) - CL peer discovery
 
