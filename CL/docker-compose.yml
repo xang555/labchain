@@ -77,7 +77,6 @@ services:
           --enr-udp-port ${P2P_PORT:-9000} \
           --enr-tcp-port ${P2P_PORT:-9000} \
           --disable-enr-auto-update \
-          --disable-discovery \
           --target-peers ${TARGET_PEERS:-100} \
           $$GENESIS_SYNC_FLAG \
           $$BOOTNODE_FLAGS \

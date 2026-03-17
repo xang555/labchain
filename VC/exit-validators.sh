@@ -229,8 +229,8 @@ check_exit_eligibility() {
     local activation_epoch
     activation_epoch=$(get_validator_activation_epoch "$beacon_url" "$pubkey")
 
-    # Check if activation_epoch is valid
-    if [[ "$activation_epoch" == "0" || "$activation_epoch" == "null" || -z "$activation_epoch" ]]; then
+    # Check if activation_epoch is valid (0 is valid for genesis validators)
+    if [[ "$activation_epoch" == "null" || -z "$activation_epoch" ]]; then
         echo "unknown"
         return
     fi
